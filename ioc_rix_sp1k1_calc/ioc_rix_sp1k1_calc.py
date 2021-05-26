@@ -1,4 +1,7 @@
+import numpy as np
+
 from caproto import ChannelData, ChannelType
+from caproto.asyncio.client import Context
 from caproto.server import AsyncLibraryLayer, PVGroup, pvproperty
 
 
@@ -6,61 +9,75 @@ class Ioc_rix_sp1k1_calc(PVGroup):
     """
     ioc-rix-sp1k1-calc.
     """
+    energy = pvproperty(
+        value=0.0,
+        name='ENERGY',
+        record='ai',
+        read_only=True,
+        doc='Calculated SP1K1 Mono energy in eV'
+        precision=3,
+        units='eV',
+        )
 
     def __init__(self, *args, **kwargs):
+        self.client_context = None
+        self.g_pi_pv = None
+        self.m_pi_pv = None
+        self.g_pi_sub = None
+        self.m_pi_sub = None
+        self.g_pi_value = None
+        self.m_pi_value = None
         super().__init__(*args, **kwargs)
-        # Init here
 
-    sample = pvproperty(
-        value=0.0,
-        name='SampleValue',
-        record='ai',
-        lower_ctrl_limit=0.0,
-        lower_alarm_limit=0.1,
-        upper_alarm_limit=0.9,
-        upper_ctrl_limit=1.0,
-        read_only=False,
-        doc='Sample value for the cookiecutter',
-        precision=3,
-    )
+    @energy.startup
+    async def value(self, instance, async_lib):
+        self.client_context = Context()
 
-    @sample.startup
-    async def sample(self,
-                     instance: ChannelData,
-                     async_lib: AsyncLibraryLayer):
-        """
-        Startup hook for sample.
-        """
-        print('This happens at IOC boot!')
-        print(f'Initial value was: {instance.value}')
-        await instance.write(value=0.1, verify_value=False)
-        print(f'Now it is: {instance.value}')
+        self.g_pi_pv, self.m_pi_v = await self.client_context.get_pvs(
+            'SP1K1:MONO:MMS:G_PI.RBV', 'SP1K1:MONO:MMS:M_PI.RBV')
 
-    @sample.putter
-    async def sample(self, instance: ChannelData, value: float):
-        """Data was written over channel access."""
-        if value >= 0.9:
-            raise ValueError('Invalid value')
+        self.g_pi_sub = self.g_pi_pv.subscribe(data_type='time')
+        self.g_pi_sub.add_callback(self._g_pi_callback)
 
-        print(f'They wrote: {value}, but {value/2} is better')
-        value /= 2.0
-        return value
+        self.m_pi_sub = self.m_pi_pv.subscribe(data_type='time')
+        self.m_pi_sub.add_callback(self._m_pi_callback)
 
-    scanned = pvproperty(
-        value=0.0,
-        name='SampleScanned',
-        record='mbbi',
-        read_only=True,
-        doc='Scanned enum',
-        enum_strings=['One', 'Two', 'Three'],
-        dtype=ChannelType.ENUM,
-    )
 
-    @scanned.scan(period=1.0, stop_on_error=False, use_scan_field=True)
-    async def scanned(self, instance: ChannelData, async_lib: AsyncLibraryLayer):
-        """
-        Scan hook for scanned.
+    async def _g_pi_callback(self, pv, response):
+        self.g_pi_value = response.data
+        await self._update_calc(response.metadata.timestamp)
 
-        This updates at a rate of 1Hz, unless the user changes .SCAN.
-        """
-        await self.scanned.write(value=(self.scanned.value + 1) % 3)
+    async def _m_pi_callback(self, pv, response):
+        self.m_pi_value = response.data
+        await self._update_calc(response.metadata.timestamp)
+
+    async def _update_calc(self, timestamp):
+        new_value = self.calculate_energy()
+        await self.energy.write(new_value, timestamp=timestamp)
+
+    def calculate_energy(self):
+        if None in (self.g_pi_value, self.m_pi_value):
+            return 0
+
+        # Calculation copied from Alex Reid's email with minimal edits
+
+        # Constants:
+        D = 5e4 # ruling density in lines per meter
+        c = 299792458 # speed of light
+        h = 6.62607015E-34 # Plank's const
+        el = 1.602176634E-19 # elemental charge
+        b = 0.03662 # beam from MR1K1 design value in radians
+        ex = 0.1221413 # exit trajectory design value in radians
+
+        # Inputs:
+        # grating pitch remove offset and convert to rad
+        g = (self.g_pi_value - 97386)/1e6
+        # pre mirror pitch remove offset and convert to rad
+        p = (self.m_pi_value - 56061)/1e6
+
+        # Calculation
+        alpha = np.pi/2 - g + 2*p - b
+        beta = np.pi/2 + g - ex
+        # Energy in eV
+        return h*c*D/(el*(np.sin(alpha)-np.sin(beta)))
+
