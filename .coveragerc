@@ -1,0 +1,11 @@
+[run]
+source =
+    ioc_rix_sp1k1_calc
+[report]
+omit =
+    #versioning
+    .*version.*
+    *_version.py
+    #tests
+    *test*
+    ioc_rix_sp1k1_calc/tests/*

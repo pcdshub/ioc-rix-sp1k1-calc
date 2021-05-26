@@ -1,0 +1,2 @@
+[flake8]
+exclude = .git,__pycache__,build,dist,versioneer.py,ioc_rix_sp1k1_calc/_version.py,docs/source/conf.py
