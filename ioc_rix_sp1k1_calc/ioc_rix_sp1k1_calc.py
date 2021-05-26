@@ -73,9 +73,9 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
         # Inputs:
         # grating pitch remove offset and convert to rad
-        g = (self.g_pi_value - 97386)/1e6
+        g = (self.g_pi_value - 63358)/1e6
         # pre mirror pitch remove offset and convert to rad
-        p = (self.m_pi_value - 56061)/1e6
+        p = (self.m_pi_value - 90641)/1e6
 
         # Calculation
         alpha = np.pi/2 - g + 2*p - b
