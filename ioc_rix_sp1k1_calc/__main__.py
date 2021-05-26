@@ -2,7 +2,7 @@ import textwrap
 
 import caproto.server
 
-from .ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
+from ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
 
 
 def main():

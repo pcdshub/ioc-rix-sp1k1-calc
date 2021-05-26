@@ -30,10 +30,10 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         super().__init__(*args, **kwargs)
 
     @energy.startup
-    async def value(self, instance, async_lib):
+    async def energy(self, instance, async_lib):
         self.client_context = Context()
 
-        self.g_pi_pv, self.m_pi_v = await self.client_context.get_pvs(
+        self.g_pi_pv, self.m_pi_pv = await self.client_context.get_pvs(
             'SP1K1:MONO:MMS:G_PI.RBV', 'SP1K1:MONO:MMS:M_PI.RBV')
 
         self.g_pi_sub = self.g_pi_pv.subscribe(data_type='time')
@@ -44,12 +44,14 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
 
     async def _g_pi_callback(self, pv, response):
-        self.g_pi_value = response.data
-        await self._update_calc(response.metadata.timestamp)
+        if self.g_pi_value is None or not np.isclose(self.g_pi_value, response.data):
+            self.g_pi_value = response.data
+            await self._update_calc(response.metadata.timestamp)
 
     async def _m_pi_callback(self, pv, response):
-        self.m_pi_value = response.data
-        await self._update_calc(response.metadata.timestamp)
+        if self.m_pi_value is None or not np.isclose(self.m_pi_value, response.data):
+            self.m_pi_value = response.data
+            await self._update_calc(response.metadata.timestamp)
 
     async def _update_calc(self, timestamp):
         new_value = self.calculate_energy()
@@ -80,4 +82,3 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         beta = np.pi/2 + g - ex
         # Energy in eV
         return h*c*D/(el*(np.sin(alpha)-np.sin(beta)))
-
