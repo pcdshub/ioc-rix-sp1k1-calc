@@ -4,6 +4,8 @@ from caproto import ChannelData, ChannelType
 from caproto.asyncio.client import Context
 from caproto.server import AsyncLibraryLayer, PVGroup, pvproperty
 
+DEADBAND = 0.05
+
 
 class Ioc_rix_sp1k1_calc(PVGroup):
     """
@@ -44,12 +46,12 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
 
     async def _g_pi_callback(self, pv, response):
-        if self.g_pi_value is None or not np.isclose(self.g_pi_value, response.data):
+        if self.g_pi_value is None or not np.isclose(self.g_pi_value, response.data, rtol=0, atol=DEADBAND):
             self.g_pi_value = response.data
             await self._update_calc(response.metadata.timestamp)
 
     async def _m_pi_callback(self, pv, response):
-        if self.m_pi_value is None or not np.isclose(self.m_pi_value, response.data):
+        if self.m_pi_value is None or not np.isclose(self.m_pi_value, response.data, rtol=0, atol=DEADBAND):
             self.m_pi_value = response.data
             await self._update_calc(response.metadata.timestamp)
 
