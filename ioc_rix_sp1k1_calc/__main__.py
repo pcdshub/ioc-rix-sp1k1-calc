@@ -12,7 +12,7 @@ def main():
     )
 
     ioc = Ioc_rix_sp1k1_calc(**ioc_options)
-    caproto.server.run(ioc.pvdb, **run_options)
+    caproto.server.run(ioc.pvdb, startup_hook=ioc.__ainit__, **run_options)
 
 
 if __name__ == '__main__':
