@@ -1,4 +1,5 @@
 #!/bin/bash
+unset PYTHONPATH
 source /reg/g/pcds/pyps/conda/py39/etc/profile.d/conda.sh
 conda activate pcds-5.8.4
 
