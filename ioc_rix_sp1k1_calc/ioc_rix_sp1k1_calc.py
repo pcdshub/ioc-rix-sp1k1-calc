@@ -33,9 +33,9 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         name="ENERGY",
         record="ai",
         read_only=True,
-        doc="Calculated SP1K1 Mono energy in eV",
+        doc="Calculated SP1K1 Mono energy in meV",
         precision=3,
-        units="eV",
+        units="meV",
         )
     cff = pvproperty(
         value=0.0,
