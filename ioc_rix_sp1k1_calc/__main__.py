@@ -13,7 +13,7 @@ def install_archive(pv_names):
     archive_file = ioc_name + '.archive'
     data_dir = environ['IOC_DATA']
     if not data_dir:
-        data_dir = '/reg/d/iocData'
+        data_dir = '/cds/data/iocData'
     archive_path = Path(data_dir, ioc_name, 'archive', archive_file)
     local_archive = Path(Path(__file__).parent.parent, archive_file)
     with open(local_archive, 'w') as f:
