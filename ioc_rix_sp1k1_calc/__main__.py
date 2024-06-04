@@ -13,9 +13,12 @@ def install_archive(pv_names):
         data_dir = '/cds/data/iocData'
     ioc_name = "ioc-rix-sp1k1-calc"
     archive_path = Path(data_dir, ioc_name, 'archive', ioc_name + '.archive')
-    with open(archive_path, 'w') as f:
-        for pv in pv_names:
-            f.write(pv + "\t30 monitor\n")
+    try:
+        with open(archive_path, 'w') as f:
+            for pv in pv_names:
+                f.write(pv + "\t30 monitor\n")
+    except Exception as e:
+        print(f"Unable to create archive file at {archive_path} due to {e}")
 
 
 def main():
