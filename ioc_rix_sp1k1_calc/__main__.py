@@ -1,7 +1,6 @@
 import textwrap
 from os import environ
 from pathlib import Path
-from shutil import copy2
 
 import caproto.server
 
@@ -9,17 +8,17 @@ from ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
 
 
 def install_archive(pv_names):
-    ioc_name = "ioc-rix-sp1k1-calc"
-    archive_file = ioc_name + '.archive'
     data_dir = environ['IOC_DATA']
     if not data_dir:
         data_dir = '/cds/data/iocData'
-    archive_path = Path(data_dir, ioc_name, 'archive', archive_file)
-    local_archive = Path(Path(__file__).parent.parent, archive_file)
-    with open(local_archive, 'w') as f:
-        for pv in pv_names:
-            f.write(pv + "\t30 monitor\n")
-    copy2(local_archive, archive_path)
+    ioc_name = "ioc-rix-sp1k1-calc"
+    archive_path = Path(data_dir, ioc_name, 'archive', ioc_name + '.archive')
+    try:
+        with open(archive_path, 'w') as f:
+            for pv in pv_names:
+                f.write(pv + "\t30 monitor\n")
+    except Exception as e:
+        print(f"Unable to create archive file at {archive_path} due to {e}")
 
 
 def main():
