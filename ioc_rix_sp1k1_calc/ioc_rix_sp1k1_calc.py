@@ -10,15 +10,15 @@ from caproto.server import AsyncLibraryLayer, PVGroup, pvproperty
 # Ignore motor moves smaller than this number
 DEADBAND = 0.05
 # Load path for scientist-modifiable utilities file
-DYNAMIC_PATH = "/cds/home/opr/rixopr/scripts/rix_utilities.py"
-DYNAMIC_NAME = "rix_utilities"
+DYNAMIC_PATH = "/cds/home/opr/rixopr/scripts/rix_calibration.py"
+DYNAMIC_NAME = "rix_calibration"
 
 
 class NoneRixDB:
     """
     Replacement for rix.db hutch-python imports.
 
-    We need to ignore any such imports if they are present in rix_utilities.py
+    We need to ignore any such imports if they are present in rix_calibration.py
     because this SIOC needs to start up without loading the entire rix
     beamline.
     """
@@ -31,9 +31,9 @@ sys.modules["rix.db"] = NoneRixDB()
 # Import the one specific file without ruining our python path
 # https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
 spec = importlib.util.spec_from_file_location(DYNAMIC_NAME, DYNAMIC_PATH)
-rix_utilities = importlib.util.module_from_spec(spec)
-sys.modules[DYNAMIC_NAME] = rix_utilities
-spec.loader.exec_module(rix_utilities)
+rix_calibration = importlib.util.module_from_spec(spec)
+sys.modules[DYNAMIC_NAME] = rix_calibration
+spec.loader.exec_module(rix_calibration)
 
 
 class Ioc_rix_sp1k1_calc(PVGroup):
@@ -153,11 +153,11 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
     def calculate_energy(self) -> tuple[float, float]:
         """
-        Run the rix_utilities calculation for the energy and cff values.
+        Run the rix_calibration calculation for the energy and cff values.
         """
         if None in (self.g_pi_value, self.m_pi_value):
             return (0, 0)
-        return rix_utilities.calc_E(self.g_pi_value, self.m_pi_value)
+        return rix_calibration.calc_E(self.g_pi_value, self.m_pi_value)
 
     async def _update_bandwidth_calc(self, timestamp):
         """
@@ -168,11 +168,11 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
     def calculate_bandwidth(self) -> float:
         """
-        Run the rix_utilities calculation for the mono bandwidth.
+        Run the rix_calibration calculation for the mono bandwidth.
         """
         if None in (self.g_pi_value, self.m_pi_value, self.exit_gap_value):
             return 0
-        return rix_utilities.calc_BW(self.exit_gap_value, self.g_pi_value, self.m_pi_value)
+        return rix_calibration.calc_BW(self.exit_gap_value, self.g_pi_value, self.m_pi_value)
 
     async def _update_grating_calc(self, timestamp):
         """
@@ -183,8 +183,8 @@ class Ioc_rix_sp1k1_calc(PVGroup):
 
     def calculate_grating(self) -> str:
         """
-        Run the rix_utilities calculation for the grating identi.
+        Run the rix_calibration calculation for the grating identi.
         """
         if self.g_h_value is None:
             return ""
-        return rix_utilities.get_grating()
+        return rix_calibration.get_grating()
