@@ -75,7 +75,7 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         )
     mr3k2_focaldist = pvproperty(
         value=0.0,
-        name="",
+        name="MR3K2:FOCUS",
         record="ai",
         read_only=True,
         doc="MR3K2 focal distance",
@@ -84,7 +84,7 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         )
     mr4k2_focaldist = pvproperty(
         value=0.0,
-        name="",
+        name="MR4K2:FOCUS",
         record="ai",
         read_only=True,
         doc="MR4K2 focal distance",
