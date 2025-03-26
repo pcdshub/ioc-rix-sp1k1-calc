@@ -8,6 +8,8 @@ from caproto.server import PVGroup, pvproperty
 
 # Ignore motor moves smaller than this number
 DEADBAND = 0.05
+BENDER_DEADBAND = 0.001
+
 # Load path for scientist-modifiable utilities file
 DYNAMIC_PATH = "/cds/home/opr/rixopr/scripts/rix_calibration.py"
 DYNAMIC_NAME = "rix_calibration"
@@ -109,16 +111,17 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         """
         self.client_context = Context()
 
-        self.g_pi_pv, self.m_pi_pv, self.exit_gap_pv,
-        self.g_h_pv, self.mr3k2_bend_pv,
-        self.mr4k2_bend_pv = await self.client_context.get_pvs(
-            "SP1K1:MONO:MMS:G_PI.RBV",
-            "SP1K1:MONO:MMS:M_PI.RBV",
-            "SL1K2:EXIT:MMS:GAP.RBV",
-            "SP1K1:MONO:MMS:G_H.RBV",
-            "MR3K2:KBH:MMS:BEND:US.RBV",
-            "MR4K2:KBV:MMS:BEND:US.RBV",
-        )
+        (self.g_pi_pv, self.m_pi_pv, self.exit_gap_pv, self.g_h_pv,
+         self.mr3k2_bend_pv, self.mr4k2_bend_pv) = (
+             await self.client_context.get_pvs(
+                 "SP1K1:MONO:MMS:G_PI.RBV",
+                 "SP1K1:MONO:MMS:M_PI.RBV",
+                 "SL1K2:EXIT:MMS:GAP.RBV",
+                 "SP1K1:MONO:MMS:G_H.RBV",
+                 "MR3K2:KBH:MMS:BEND:US.RBV",
+                 "MR4K2:KBV:MMS:BEND:US.RBV",
+             )
+         )
 
         self.g_pi_sub = self.g_pi_pv.subscribe(data_type="time")
         self.g_pi_sub.add_callback(self._g_pi_callback)
@@ -185,7 +188,8 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         Update calculations that use the mr3k2 bender position.
         """
         if self.mr3k2_bend_value is None or not np.isclose(
-                self.mr3k2_bend_value, response.data, rtol=0, atol=DEADBAND
+                self.mr3k2_bend_value, response.data, rtol=0,
+                atol=BENDER_DEADBAND
         ):
             self.mr3k2_bend_value = response.data
             await self._update_focaldist_calc(response.metadata.timestamp)
@@ -195,7 +199,8 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         Update calculations that use the mr4k2 bender position.
         """
         if self.mr4k2_bend_value is None or not np.isclose(
-                self.mr4k2_bend_value, response.data, rtol=0, atol=DEADBAND
+                self.mr4k2_bend_value, response.data, rtol=0,
+                atol=BENDER_DEADBAND
         ):
             self.mr4k2_bend_value = response.data
             await self._update_focaldist_calc(response.metadata.timestamp)
@@ -253,6 +258,10 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         Update our focal distance PVs based on the most recent values.
         """
         new_mr3k2_focaldist, new_mr4k2_focaldist = self.calculate_focaldists()
+        await self.mr3k2_focaldist.write(
+            new_mr3k2_focaldist, timestamp=timestamp)
+        await self.mr4k2_focaldist.write(
+            new_mr4k2_focaldist, timestamp=timestamp)
 
     def calculate_focaldists(self) -> tuple[float, float]:
         """
