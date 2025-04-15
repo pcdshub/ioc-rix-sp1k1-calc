@@ -1,0 +1,31 @@
+# default group
+* @pcdshub/rix-members
+
+# language-specific group(s)
+## EPICS files
+*.archive @pcdshub/epics-reviewers @pcdshub/rix-members
+*.autosave @pcdshub/epics-reviewers @pcdshub/rix-members
+*.cmd @pcdshub/epics-reviewers @pcdshub/rix-members
+*.db @pcdshub/epics-reviewers @pcdshub/rix-members
+*.dbd @pcdshub/epics-reviewers @pcdshub/rix-members
+*.edl @pcdshub/epics-reviewers @pcdshub/rix-members
+*.ioc @pcdshub/epics-reviewers @pcdshub/rix-members
+*.proto @pcdshub/epics-reviewers @pcdshub/rix-members
+*.req @pcdshub/epics-reviewers @pcdshub/rix-members
+*.sub-arch @pcdshub/epics-reviewers @pcdshub/rix-members
+*.sub-req @pcdshub/epics-reviewers @pcdshub/rix-members
+*.substitutions @pcdshub/epics-reviewers @pcdshub/rix-members
+*.tpl-arch @pcdshub/epics-reviewers @pcdshub/rix-members
+*.tpl-req @pcdshub/epics-reviewers @pcdshub/rix-members
+RELEASE_SITE @pcdshub/epics-reviewers @pcdshub/rix-members
+/configure/RELEASE @pcdshub/epics-reviewers @pcdshub/rix-members
+## PYTHON files
+*.py @pcdshub/python-reviewers @pcdshub/rix-members
+*.pyi @pcdshub/python-reviewers @pcdshub/rix-members
+*.pyc @pcdshub/python-reviewers @pcdshub/rix-members
+*.pyw @pcdshub/python-reviewers @pcdshub/rix-members
+*.pyx @pcdshub/python-reviewers @pcdshub/rix-members
+*.pyd @pcdshub/python-reviewers @pcdshub/rix-members
+
+# github folder holds administrative files
+.github/** @pcdshub/software-admin
