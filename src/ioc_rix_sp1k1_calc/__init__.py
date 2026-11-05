@@ -1,3 +1,4 @@
+"""Launcher for the server."""
 import textwrap
 from os import environ
 from pathlib import Path
@@ -8,6 +9,7 @@ from ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
 
 
 def install_archive(pv_names):
+    """Update the archive request file."""
     data_dir = environ['IOC_DATA']
     if not data_dir:
         data_dir = '/cds/data/iocData'
@@ -22,6 +24,7 @@ def install_archive(pv_names):
 
 
 def main():
+    """Run the server process."""
     ioc_options, run_options = caproto.server.ioc_arg_parser(
         default_prefix='SP1K1:MONO:CALC:',
         desc=textwrap.dedent(Ioc_rix_sp1k1_calc.__doc__)
@@ -30,7 +33,3 @@ def main():
     ioc = Ioc_rix_sp1k1_calc(**ioc_options)
     install_archive(ioc.pvdb.keys())
     caproto.server.run(ioc.pvdb, startup_hook=ioc.__ainit__, **run_options)
-
-
-if __name__ == '__main__':
-    main()

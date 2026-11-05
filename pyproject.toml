@@ -1,0 +1,36 @@
+[project]
+name = "ioc-rix-sp1k1-calc"
+version = "2.0.0"
+description = "Calculation IOC for the RIX Mono (SP1K1)"
+readme = "README.md"
+license = "LicenseRef-SLAC-BSD-3-Clause"
+license-files = ["LICENSE.md"]
+authors = [
+    { name = "SLAC National Accelerator Laboratory" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "caproto[standard]>=1.3.0",
+]
+
+[project.scripts]
+ioc-rix-sp1k1-calc = "ioc_rix_sp1k1_calc:main"
+
+[build-system]
+requires = ["uv_build>=0.13.4,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+exclude = [".git", "__pycache__", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["B", "C", "D", "E", "F", "I", "W"]
+extend-select = ["D213"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.uv]
+# Avoid supply chain risk during uv build
+exclude-newer = "7 days"
