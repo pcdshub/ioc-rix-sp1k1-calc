@@ -1,20 +1,22 @@
 """
-Calculations for RIX Mono (SP1K1) energy
+Calculations for RIX Mono (SP1K1) energy.
 
 This is shared code between rix3 and ioc-rix-sp1k1-calc
 
 Things to keep in mind:
 - Keep as close to a calculations-only module as possible
 - No EPICS gets outside of functions
-- Must have a way to run each calculation function without an EPICS get
+- Must have a way to run each calculation function without an EPICS get (useful for IOC and for testing)
 - Don't change function names
 - Don't import rix.db or other hutch-python-only objects
 
 This should be copied into ioc-rix-sp1k1-calc after any necessary calculation change
 """
-from epics import caget
+
+import typing
+
 import numpy as np
-import time
+from epics import caget, caput
 
 ###############################################################################
 #### GLOBAL CONSTANTS
@@ -47,564 +49,461 @@ thetaM1 = 0.03662
 thetaES = 0.1221413
 
 
-def get_grating() -> :
+def caget_with_error(pvname: str) -> typing.Any:
+    """Wrap pyepics's caget with basic error handling."""
+    value = caget(pvname)
+    if value is None:
+        raise RuntimeError("Failed to read PV: " + pvname)
+    return value
+
+
+def get_pitch_g(rbv: bool = True) -> float:
+    """Return the live grating pitch position."""
+    pv = "SP1K1:MONO:MMS:G_PI"
+    if rbv:
+        pv += ".RBV"
+    return caget_with_error(pv)
+
+
+def get_pitch_g_velo() -> float:
+    """Return the live grating pitch velocity."""
+    return caget_with_error("SL1K2:EXIT:MMS:G_PI.VELO")
+
+
+def get_pitch_m2(rbv: bool = True) -> float:
+    """Return the live mirror pitch position."""
+    pv = "SP1K1:MONO:MMS:M_PI"
+    if rbv:
+        pv += ".RBV"
+    return caget_with_error(pv)
+
+
+def get_exit_slit_gap(rbv: bool = True) -> float:
+    """Return the live exit slit gap."""
+    pv = "SL1K2:EXIT:MMS:GAP"
+    if rbv:
+        pv += ".RBV"
+    return caget_with_error(pv)
+
+
+def get_dif_order() -> int:
+    """Return the diffraction order."""
+    return caget_with_error("SP1K1:MONO:CALC:DIF_ORDER")
+
+
+def get_grating() -> str:
+    """Return the live grating state."""
+    return caget_with_error("SP1K1:MONO:GRATING:STATE:GET_RBV")
+
+
+def get_grating_offset(grating: str = "") -> float:
     """
-    Just reads the grating state PV
+    Return the offset of the input grating.
+
+    Uses the active grating if none is provided.
     """
-    PV_stateG = 'SP1K1:MONO:GRATING:STATE:GET_RBV'
-    try:
-        temppv = EpicsSignal(PV_stateG)
-        stateG = temppv.get()
-        #print('Grating state RBV {0}'.format(stateG))
-    except:
-        print('Failed to read PV: ' + PV_stateG)
+    if not grating:
+        grating = get_grating()
+    if grating == "LRG":
+        return offsetG_LRG + caget_with_error("SP1K1:MONO:CALC:LRG_OFFSET")
+    elif grating == "LEG":
+        return offsetG_LEG + caget_with_error("SP1K1:MONO:CALC:LEG_OFFSET")
+    elif grating == "MEG":
+        return offsetG_MEG + caget_with_error("SP1K1:MONO:CALC:MEG_OFFSET")
+    elif grating == "HEG":
+        return offsetG_HEG + caget_with_error("SP1K1:MONO:CALC:HEG_OFFSET")
+    else:
+        raise RuntimeError("Horizontal position is off grating.")
 
-    return stateG
+
+def get_grating_period(grating: str = "") -> float:
+    """
+    Return the period of the input grating.
+
+    Uses the active grating if none is provided.
+    """
+    if not grating:
+        grating = get_grating()
+    if grating == "LRG":
+        return D0_LRG
+    elif grating == "LEG":
+        return D0_LEG
+    elif grating == "MEG":
+        return D0_MEG
+    elif grating == "HEG":
+        return D0_HEG
+    else:
+        raise RuntimeError("Horizontal position is off grating.")
 
 
-def calc_pitch(*args):
-    '''
-    Calculates the grating pitch and Cff for given photon energy and pre-mirror pitch.
+def calc_pitch(
+    E: float,
+    pitchM2: float | None = None,
+    dif_order: int | None = None,
+    offsetG: float | None = None,
+    D0: float | None = None,
+) -> tuple[float, float]:
+    """
+    Calculate the grating pitch and Cff for given photon energy and pre-mirror pitch.
+
     Based on Alex Reid calculator.
-    Arguments:  args[0] (required) - photon energy (eV)
-                args[1] (optional) - pre-mirror pitch (urad)
+    Arguments:  E (required) - photon energy (eV)
+                pitchM2 (optional) - pre-mirror pitch (urad)
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
                 If only photon energy is provided then current pre-mirror pitch is used.
     Returns:    grating pitch (urad) and Cff
     Examples:   calc_pitch(400) - calculates grating pitch corresponding to 400 eV at the current pre-mirror pitch
                 calc_pitch(500, 144650) - calculates grating pitch for 500 eV and 144650 urad pre-mirror pitch
-    '''
-
-    if len(args)==1:
-        E = args[0]
-        PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            #print('Pre-mirror pitch RBV {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2+'.RBV')
-    elif len(args)==2:
-        E = args[0]
-        pitchM2 = args[1]
-    else:
-        raise Exception('One or two arguments needed.')
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
-
+    """
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2()
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 1 # diffraction order
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
 
-    pM2 = pitchM2*1e-6 - offsetM2
-    a0 = dif_order*D0*eVmm/E
-    pG = pM2 - 0.5*thetaM1 + 0.5*thetaES  - np.arcsin(0.5*a0/np.cos(0.5*np.pi+pM2-0.5*thetaM1-0.5*thetaES))
-    alpha = np.pi/2 - pG + 2*pM2 - thetaM1
-    beta = -np.pi/2 - pG + thetaES
-    Cff = np.cos(beta)/np.cos(alpha)
+    pM2 = pitchM2 * 1e-6 - offsetM2
+    a0 = dif_order * D0 * eVmm / E
+    pG = (
+        pM2
+        - 0.5 * thetaM1
+        + 0.5 * thetaES
+        - np.arcsin(0.5 * a0 / np.cos(0.5 * np.pi + pM2 - 0.5 * thetaM1 - 0.5 * thetaES))
+    )
+    alpha = np.pi / 2 - pG + 2 * pM2 - thetaM1
+    beta = -np.pi / 2 - pG + thetaES
+    Cff = np.cos(beta) / np.cos(alpha)
 
     # grating pitch in urad
-    pitchG = (pG + offsetG)*1e6
+    pitchG = (pG + offsetG) * 1e6
 
-    #print('Calculated grating pitch {0:8.2f} urad, Cff {1:3.2f}'.format(pitchG, Cff))
+    # print('Calculated grating pitch {0:8.2f} urad, Cff {1:3.2f}'.format(pitchG, Cff))
     return pitchG, Cff
 
-def calc_pitchCff(E, Cff):
-    '''
-    Calculates the grating and pre-mirror pitch for given photon energy and Cff value.
+
+def calc_pitchCff(
+    E: float, Cff: float, dif_order: int | None = None, offsetG: float | None = None, D0: float | None = None
+) -> tuple[float, float]:
+    """
+    Calculate the grating and pre-mirror pitch for given photon energy and Cff value.
+
     Based on Alex Reid calculator.
     Arguments:  E (required) - photon energy (eV)
                 Cff (required) - Cff value
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
     Returns:    grating and pre-mirror pitch (urad)
     Example:    calc_pitchCff(400, 1.2) - calculates grating and pre-mirror pitch for 400 eV and Cff 1.2
-    '''
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
+    """
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 2 # diffraction order
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
+    # m = 2 # diffraction order
 
-    a0 = dif_order*D0*eVmm/E
-    beta = -np.arccos(np.sqrt((-a0**2*Cff**2*(1+Cff**2) + 2*a0*Cff**2*np.sqrt(a0**2*Cff**2+Cff**4-2*Cff**2+1))/(Cff**4 - 2*Cff**2 + 1)))
+    a0 = dif_order * D0 * eVmm / E
+    beta = -np.arccos(
+        np.sqrt(
+            (-(a0**2) * Cff**2 * (1 + Cff**2) + 2 * a0 * Cff**2 * np.sqrt(a0**2 * Cff**2 + Cff**4 - 2 * Cff**2 + 1))
+            / (Cff**4 - 2 * Cff**2 + 1)
+        )
+    )
     alpha = np.arcsin(a0 - np.sin(beta))
-    pG = -beta - np.pi/2 + thetaES
-    pM2 = 0.5*(alpha - np.pi/2 + pG + thetaM1)
+    pG = -beta - np.pi / 2 + thetaES
+    pM2 = 0.5 * (alpha - np.pi / 2 + pG + thetaM1)
 
     #
-    pitchM2 = (pM2 + offsetM2)*1e6
-    pitchG = (pG + offsetG)*1e6
+    pitchM2 = (pM2 + offsetM2) * 1e6
+    pitchG = (pG + offsetG) * 1e6
 
-    #print('Calculated pre-mirror pitch {0:8.2f} urad'.format(pitchM2))
-    #print('Calculated grating pitch {0:8.2f} urad'.format(pitchG))
+    # print('Calculated pre-mirror pitch {0:8.2f} urad'.format(pitchM2))
+    # print('Calculated grating pitch {0:8.2f} urad'.format(pitchG))
     return pitchG, pitchM2
 
-def calc_E(*args):
-    '''
-    Calculates photon energy and Cff for given grating and pre-mirror pitch.
+
+def calc_E(
+    pitchG: float | None = None,
+    pitchM2: float | None = None,
+    dif_order: int | None = None,
+    offsetG: float | None = None,
+    D0: float | None = None,
+) -> tuple[float, float]:
+    """
+    Calculate photon energy and Cff for given grating and pre-mirror pitch.
+
     Based on Alex Reid calculator.
-    Arguments:  args[0] (optional) - grating pitch (urad)
-                args[1] (optional) - pre-mirror pitch (urad)
-                If grating or pre-mirror pitch are not provided then current values are used.
+    Arguments:  pitchG (optional) - grating pitch (urad)
+                pitchM2 (optional) - pre-mirror pitch (urad)
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
     Returns:    photon energy (eV) and Cff
-    Examples:   calc_E() - calculates grating and pre-mirror pitch at current position, should be same as SP1K1:MONO:CALC:ENERGY
+    Examples:   calc_E() - calculates grating and pre-mirror pitch at current position, should be same as
+                           SP1K1:MONO:CALC:ENERGY
                 calc_E(153650) - calculates photon energy for 153650 urad grating pitch and current pre-mirror pitch
-                calc_E(153650, 140800) - calculates photon energy for 153650 urad grating pitch and 144650 urad pre-mirror pitch
-    '''
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    if len(args)==0:
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            temppv = EpicsSignal(PV_pitchG)
-            pitchG_target = temppv.get()
-            #print('Grating pitch RBV {0:8.2f} urad, target {1:8.2f} urad'.format(pitchG, pitchG_target))
-        except:
-            print('Failed to read PV: ' + PV_pitchG)
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            temppv = EpicsSignal(PV_pitchM2)
-            pitchM2_target = temppv.get()
-            #print('Pre-mirror pitch RBV {0:8.2f} urad, target {1:8.2f} urad'.format(pitchM2, pitchM2_target))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2)
-    elif len(args)==1:
-        pitchG = args[0]
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2_rbv = temppv.get()
-            temppv = EpicsSignal(PV_pitchM2)
-            pitchM2 = temppv.get()
-            #print('Pre-mirror pitch RBV {0:8.2f} urad, target {1:8.2f} urad'.format(pitchM2, pitchM2_target))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2)
-    elif len(args)==2:
-        pitchG = args[0]
-        pitchM2 = args[1]
-    else:
-        raise Exception('Too many arguments.')
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
+                calc_E(153650, 140800) - calculates photon energy for 153650 urad grating pitch and 144650 urad
+                                         pre-mirror pitch
+    """
+    if pitchG is None:
+        pitchG = get_pitch_g()
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2()
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 1 # diffraction order
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
+    # m = 1 # diffraction order
 
-    pG = pitchG*1e-6 - offsetG
-    pM2 = pitchM2*1e-6 - offsetM2
-    alpha = np.pi/2 - pG + 2*pM2 - thetaM1
-    beta = -np.pi/2 - pG + thetaES
-    E = dif_order*D0*eVmm/(np.sin(alpha) + np.sin(beta))
-    Cff = np.cos(beta)/np.cos(alpha)
+    pG = pitchG * 1e-6 - offsetG
+    pM2 = pitchM2 * 1e-6 - offsetM2
+    alpha = np.pi / 2 - pG + 2 * pM2 - thetaM1
+    beta = -np.pi / 2 - pG + thetaES
+    E = dif_order * D0 * eVmm / (np.sin(alpha) + np.sin(beta))
+    Cff = np.cos(beta) / np.cos(alpha)
 
-    #print('Calculated photon energy {0:6.2f} eV, Cff {1:3.2f}'.format(E, Cff))
+    # print('Calculated photon energy {0:6.2f} eV, Cff {1:3.2f}'.format(E, Cff))
     return E, Cff
 
-def calc_BW(*args):
-    '''
-    Calculates mono bandwidth (eV).
-    Arguments:  args[0] (optional) - exit slit gap (um)
-                args[1] (optional) - grating pitch (urad)
-                args[2] (optional) - pre-mirror pitch (urad)
-                If slit or grating or pre-mirror pitch are not provided then current values are used.
+
+def calc_BW(
+    slit: float | None = None,
+    pitchG: float | None = None,
+    pitchM2: float | None = None,
+    dif_order: int | None = None,
+    offsetG: float | None = None,
+    D0: float | None = None,
+) -> float:
+    """
+    Calculate mono bandwidth (eV).
+
+    Arguments:  slit (optional) - exit slit gap (um)
+                pitchG (optional) - grating pitch (urad)
+                pitchM2 (optional) - pre-mirror pitch (urad)
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
     Returns:    mono bandwidth (eV)
     Examples:   calc_BW() - calculates monochromator bandwidth at the current slit and mono settings
                 calc_BW(0.1) - calculates monochromator bandwidth for 0.1 mm slit at the current mono setting
-                calc_BW(0.1, 153650, 140800) - calculates monochromator bandwidth for 0.1 mm slit and 153650 urad grating pitch and 144650 urad pre-mirror pitch
-    '''
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    PV_slit = 'SL1K2:EXIT:MMS:GAP'
-    if len(args)==0:
-        try:
-            temppv = EpicsSignal(PV_slit+'.RBV')
-            slit = temppv.get()
-            print('Exit slit gap is {0:8.2f} um'.format(slit))
-        except:
-            print('Failed to read PV: ' + PV_slit+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            print('Grating pitch is {0:8.2f} urad'.format(pitchG))
-        except:
-            print('Failed to read PV: ' + PV_pitchG+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==1:
-        slit = args[0]
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            print('Grating pitch is {0:8.2f} urad'.format(pitchG))
-        except:
-            print('Failed to read PV: ' + PV_pitchG+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==2:
-        slit = args[0]
-        pitchG = args[1]
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==3:
-        slit = args[0]
-        pitchG = args[1]
-        pitchM2 = args[2]
-    else:
-        raise Exception('Too many arguments.')
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
+                calc_BW(0.1, 153650, 140800) - calculates monochromator bandwidth for 0.1 mm slit and 153650 urad
+                                               grating pitch and 144650 urad pre-mirror pitch
+    """
+    if slit is None:
+        slit = get_exit_slit_gap()
+        print("Exit slit gap is {0:8.2f} um".format(slit))
+    if pitchG is None:
+        pitchG = get_pitch_g()
+        print("Grating pitch is {0:8.2f} urad".format(pitchG))
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2()
+        print("Pre-mirror pitch is {0:8.2f} urad".format(pitchM2))
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 1 # diffraction order
-    R = 20.0e3 # mm, exit slit distance
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
+    # m = 1 # diffraction order
+    R = 20.0e3  # mm, exit slit distance
 
+    pG = pitchG * 1e-6 - offsetG
+    pM2 = pitchM2 * 1e-6 - offsetM2
+    alpha = np.pi / 2 - pG + 2 * pM2 - thetaM1
+    beta = -np.pi / 2 - pG + thetaES
 
-    pG = pitchG*1e-6 - offsetG
-    pM2 = pitchM2*1e-6 - offsetM2
-    alpha = np.pi/2 - pG + 2*pM2 - thetaM1
-    beta = -np.pi/2 - pG + thetaES
-    
-    #E = m*D0*eVmm/(np.sin(alpha) + np.sin(beta))
-    #Cff = np.cos(beta)/np.cos(alpha)
-    ang_disp = dif_order*D0*eVmm*np.cos(beta)/(np.sin(alpha) + np.sin(beta))**2 # angular dispersion
-    lin_disp = ang_disp/R # linear dispersion
-    BW = (slit/1000)*lin_disp
-    
-    #print('Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}'.format(E, Cff))
-    #print('Angular dispersion is {0:6.2f} eV/rad'.format(ang_disp))
-    #print('Linear dispersion is {0:6.2f} eV/mm'.format(lin_disp))
-    #print('Bandwidth is {0:6.2f} eV'.format(BW))
+    # E = m*D0*eVmm/(np.sin(alpha) + np.sin(beta))
+    # Cff = np.cos(beta)/np.cos(alpha)
+    ang_disp = dif_order * D0 * eVmm * np.cos(beta) / (np.sin(alpha) + np.sin(beta)) ** 2  # angular dispersion
+    lin_disp = ang_disp / R  # linear dispersion
+    BW = (slit / 1000) * lin_disp
+
+    # print('Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}'.format(E, Cff))
+    # print('Angular dispersion is {0:6.2f} eV/rad'.format(ang_disp))
+    # print('Linear dispersion is {0:6.2f} eV/mm'.format(lin_disp))
+    # print('Bandwidth is {0:6.2f} eV'.format(BW))
     return BW
 
-def calc_grating_velocity_eV(*args):
-    '''
-    Calculates mono grating velocity.
-    Arguments:  args[0] (optional) - grating velocity in urad (urad/sec)
-                args[1] (optional) - grating pitch (urad)
-                args[2] (optional) - pre-mirror pitch (urad)
-                If velocity or grating or pre-mirror pitch are not provided then current values are used.
+
+def calc_grating_velocity_eV(
+    velocity: float | None = None,
+    pitchG: float | None = None,
+    pitchM2: float | None = None,
+    dif_order: int | None = None,
+    offsetG: float | None = None,
+    D0: float | None = None,
+):
+    """
+    Calculate mono grating velocity.
+
+    Arguments:  velocity - grating velocity in urad (urad/sec)
+                pitchG - grating pitch (urad)
+                pitchM2 - pre-mirror pitch (urad)
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
     Returns:    grating velocity (eV/sec)
     Examples:   calc_grating_velocity_eV() - calculates monochromator velocity at the current mono settings
-    '''
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    PV_velocity = 'SL1K2:EXIT:MMS:G_PI.VELO'
-    if len(args)==0:
-        try:
-            temppv = EpicsSignal(PV_velocity+'.RBV')
-            velocity = temppv.get()
-            print('Velocity is {0:8.2f} urad/sec'.format(velocity))
-        except:
-            print('Failed to read PV: ' + PV_velocity+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            print('Grating pitch is {0:8.2f} urad'.format(pitchG))
-        except:
-            print('Failed to read PV: ' + PV_pitchG+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==1:
-        velocity = args[0]
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            print('Grating pitch is {0:8.2f} urad'.format(pitchG))
-        except:
-            print('Failed to read PV: ' + PV_pitchG+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==2:
-        velocity = args[0]
-        pitchG = args[1]
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==3:
-        velocity = args[0]
-        pitchG = args[1]
-        pitchM2 = args[2]
-    else:
-        raise Exception('Too many arguments.')
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
+    """
+    if velocity is None:
+        velocity = get_pitch_g_velo()
+        print("Velocity is {0:8.2f} urad/sec".format(velocity))
+    if pitchG is None:
+        pitchG = get_pitch_g()
+        print("Grating pitch is {0:8.2f} urad".format(pitchG))
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2()
+        print("Pre-mirror pitch is {0:8.2f} urad".format(pitchM2))
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 1 # diffraction order
-    #R = 20.0e3 # mm, exit slit distance
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
+    # m = 1 # diffraction order
+    # R = 20.0e3 # mm, exit slit distance
 
+    pG = pitchG * 1e-6 - offsetG
+    pM2 = pitchM2 * 1e-6 - offsetM2
+    alpha = np.pi / 2 - pG + 2 * pM2 - thetaM1
+    beta = -np.pi / 2 - pG + thetaES
 
-    pG = pitchG*1e-6 - offsetG
-    pM2 = pitchM2*1e-6 - offsetM2
-    alpha = np.pi/2 - pG + 2*pM2 - thetaM1
-    beta = -np.pi/2 - pG + thetaES
-    
-    E = dif_order*D0*eVmm/(np.sin(alpha) + np.sin(beta))
-    Cff = np.cos(beta)/np.cos(alpha)
-    ang_disp = dif_order*D0*eVmm*np.cos(beta)/(np.sin(alpha) + np.sin(beta))**2 # angular dispersion
-    velocity_eV = ang_disp*velocity*1e-6
-    
-    print('Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}'.format(E, Cff))
-    print('Angular dispersion is {0:6.2f} eV/urad'.format(ang_disp*1e-6))
-    print('Velocity is {0:6.2f} eV/sec'.format(velocity_eV))
+    E = dif_order * D0 * eVmm / (np.sin(alpha) + np.sin(beta))
+    Cff = np.cos(beta) / np.cos(alpha)
+    ang_disp = dif_order * D0 * eVmm * np.cos(beta) / (np.sin(alpha) + np.sin(beta)) ** 2  # angular dispersion
+    velocity_eV = ang_disp * velocity * 1e-6
+
+    print("Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}".format(E, Cff))
+    print("Angular dispersion is {0:6.2f} eV/urad".format(ang_disp * 1e-6))
+    print("Velocity is {0:6.2f} eV/sec".format(velocity_eV))
     return velocity_eV
 
-def calc_slit(*args):
-    '''
-    Calculates exit slit gap (um).
-    Arguments:  args[0] (required) - bandwidth (eV)
-                args[1] (optional) - grating pitch (urad)
-                args[2] (optional) - pre-mirror pitch (urad)
-                If grating or pre-mirror pitch are not provided then current values are used.
+
+def calc_slit(
+    BW: float,
+    pitchG: float | None = None,
+    pitchM2: float | None = None,
+    dif_order: int | None = None,
+    offsetG: float | None = None,
+    D0: float | None = None,
+):
+    """
+    Calculate exit slit gap (um).
+
+    Arguments:  BW (required) - bandwidth (eV)
+                pitchG (optional) - grating pitch (urad)
+                pitchM2 (optional) - pre-mirror pitch (urad)
+                dif_order (optional) - diffraction order
+                offsetG (optional) - grating offset (mm)
+                D0 (optional) - grating period (1/mm)
+                All optional arguments will pull from live PV values.
     Returns:    gap (um)
     Examples:   calc_slit(0.1) - calculates exit slit gap for 0.1 eV bandwidth at the current mono setting
-                calc_slit(0.1, 153650, 140800) - calculates exit slit gap for 0.1 eV bandwidth for 153650 urad grating pitch and 144650 urad pre-mirror pitch
-    '''
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    if len(args)==1:
-        BW = args[0]
-        try:
-            temppv = EpicsSignal(PV_pitchG+'.RBV')
-            pitchG = temppv.get()
-            print('Grating pitch is {0:8.2f} urad'.format(pitchG))
-        except:
-            print('Failed to read PV: ' + PV_pitchG+'.RBV')
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==2:
-        BW = args[0]
-        pitchG = args[1]
-        try:
-            temppv = EpicsSignal(PV_pitchM2+'.RBV')
-            pitchM2 = temppv.get()
-            print('Pre-mirror pitch is {0:8.2f} urad'.format(pitchM2))
-        except:
-            print('Failed to read PV: ' + PV_pitchM2 + '.RBV')
-    elif len(args)==3:
-        BW = args[0]
-        pitchG = args[1]
-        pitchM2 = args[2]
-    else:
-        raise Exception('One, two or three arguments required.')
-
-    stateG = get_grating()
-    if stateG=='LRG':
-        D0 = D0_LRG
-        offsetG = offsetG_LRG
-    elif stateG=='LEG':
-        D0 = D0_LEG
-        offsetG = offsetG_LEG
-    elif stateG=='MEG':
-        D0 = D0_MEG
-        offsetG = offsetG_MEG
-    elif stateG=='HEG':
-        D0 = D0_HEG
-        offsetG = offsetG_HEG
-    else:
-        raise Exception('Horizontal position is off grating.')
+                calc_slit(0.1, 153650, 140800) - calculates exit slit gap for 0.1 eV bandwidth for 153650 urad grating
+                                                 pitch and 144650 urad pre-mirror pitch
+    """
+    if pitchG is None:
+        pitchG = get_pitch_g()
+        print("Grating pitch is {0:8.2f} urad".format(pitchG))
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2()
+        print("Pre-mirror pitch is {0:8.2f} urad".format(pitchM2))
+    if dif_order is None:
+        dif_order = get_dif_order()
+    if offsetG is None:
+        offsetG = get_grating_offset()
+    if D0 is None:
+        D0 = get_grating_period()
 
     # constants
-    eVmm = 0.001239842 # Wavelenght[mm] = eVmm/Energy[eV]
-    #m = 2 # diffraction order
-    R = 20.0e3 # mm, exit slit distance
+    eVmm = 0.001239842  # Wavelenght[mm] = eVmm/Energy[eV]
+    # m = 2 # diffraction order
+    R = 20.0e3  # mm, exit slit distance
+
+    pG = pitchG * 1e-6 - offsetG
+    pM2 = pitchM2 * 1e-6 - offsetM2
+    alpha = np.pi / 2 - pG + 2 * pM2 - thetaM1
+    beta = -np.pi / 2 - pG + thetaES
+
+    # E = m*D0*eVmm/(np.sin(alpha) + np.sin(beta))
+    # Cff = np.cos(beta)/np.cos(alpha)
+    ang_disp = dif_order * D0 * eVmm * np.cos(beta) / (np.sin(alpha) + np.sin(beta)) ** 2  # angular dispersion
+    lin_disp = ang_disp / R  # linear dispersion
+    slit = BW / lin_disp
+
+    # print('Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}'.format(E, Cff))
+    # print('Angular dispersion is {0:6.2f} eV/rad'.format(ang_disp))
+    # print('Linear dispersion is {0:6.2f} eV/mm'.format(lin_disp))
+    # print('Exit slit gap {0:6.2f} eV'.format(BW))
+    return slit * 1000
 
 
-    pG = pitchG*1e-6 - offsetG
-    pM2 = pitchM2*1e-6 - offsetM2
-    alpha = np.pi/2 - pG + 2*pM2 - thetaM1
-    beta = -np.pi/2 - pG + thetaES
-    
-    #E = m*D0*eVmm/(np.sin(alpha) + np.sin(beta))
-    #Cff = np.cos(beta)/np.cos(alpha)
-    ang_disp = dif_order*D0*eVmm*np.cos(beta)/(np.sin(alpha) + np.sin(beta))**2 # angular dispersion
-    lin_disp = ang_disp/R # linear dispersion
-    slit = BW/lin_disp
-    
-    #print('Calculated photon energy is {0:6.2f} eV, Cff is {1:3.2f}'.format(E, Cff))
-    #print('Angular dispersion is {0:6.2f} eV/rad'.format(ang_disp))
-    #print('Linear dispersion is {0:6.2f} eV/mm'.format(lin_disp))
-    #print('Exit slit gap {0:6.2f} eV'.format(BW))
-    return slit*1000
+def calc_slitE(BW: float, E: float, Cff: float):
+    """
+    Calculate exit slit gap (um).
 
-def calc_slitE(*args):
-    '''
-    Calculates exit slit gap (um).
-    Arguments:  args[0] (required) - bandwidth (eV)
-                args[1] (required) - photon energy (eV)
-                args[2] (required) - Cff value
+    Arguments:  BW (required) - bandwidth (eV)
+                E (required) - photon energy (eV)
+                Cff (required) - Cff value
     Returns:   gap (um)
     Examples:  calc_slitE(0.1, 400, 1.2) - calculates exit slit gap for 0.1 eV bandwidth at 400 eV and 1.2 Cff
-    '''
-
-    BW = args[0]
-    E = args[1]
-    Cff = args[2]
-
+    """
     pitchG, pitchM2 = calc_pitchCff(E, Cff)
     slit = calc_slit(BW, pitchG, pitchM2)
 
     return slit
 
+
 def get_E():
-    '''
+    """
+    Print current status.
+
     Reports current photon energy and Cff for based on current grating and pre-mirror pitch target and RBV.
     Reports mono bandwidth based on the exit slit gap.
     Reports the FEL set energy.
     Arguments: none
     Returns:   none
-    '''
+    """
+    pitchG = get_pitch_g()
+    pitchG_target = get_pitch_g(rbv=False)
+    pitchM2 = get_pitch_m2()
+    pitchM2_target = get_pitch_m2(rbv=False)
+    slit = get_exit_slit_gap()
+    slit_target = get_exit_slit_gap(rbv=False)
 
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    PV_slit = 'SL1K2:EXIT:MMS:GAP'
-    PV_SET1 = 'RIX:USER:MCC:EPHOTK:SET1'
+    E_FEL = caget_with_error("RIX:USER:MCC:EPHOTK:SET1")
 
-    try:
-        temppv = EpicsSignal(PV_pitchG+'.RBV')
-        pitchG = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_pitchG+'.RBV')
-    try:
-        temppv = EpicsSignal(PV_pitchG)
-        pitchG_target = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_pitchG)
-    try:
-        temppv = EpicsSignal(PV_pitchM2+'.RBV')
-        pitchM2 = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_pitchM2+'.RBV')
-    try:
-        temppv = EpicsSignal(PV_pitchM2)
-        pitchM2_target = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_pitchM2)
-    try:
-        temppv = EpicsSignal(PV_slit+'.RBV')
-        slit = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_slit+'.RBV')
-    try:
-        temppv = EpicsSignal(PV_slit)
-        slit_target = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_slit)
-
-    try:
-        temppv = EpicsSignal(PV_SET1)
-        E_FEL = temppv.get()
-    except:
-        print('Failed to read PV: ' + PV_SET1)
-
-    print('Grating pitch RBV {0:8.2f} urad, target {1:8.2f} urad'.format(pitchG, pitchG_target))
-    print('Pre-mirror pitch RBV {0:8.2f} urad, target {1:8.2f} urad'.format(pitchM2, pitchM2_target))
-    print('Exit slit gap RBV {0:3.2f} um, target {1:3.2f} um'.format(slit, slit_target))
+    print("Grating pitch RBV {0:8.2f} urad, target {1:8.2f} urad".format(pitchG, pitchG_target))
+    print("Pre-mirror pitch RBV {0:8.2f} urad, target {1:8.2f} urad".format(pitchM2, pitchM2_target))
+    print("Exit slit gap RBV {0:3.2f} um, target {1:3.2f} um".format(slit, slit_target))
 
     # RBV
     E, Cff = calc_E(pitchG, pitchM2)
@@ -614,136 +513,115 @@ def get_E():
     E_target, Cff_target = calc_E(pitchG_target, pitchM2_target)
     BW_target = calc_BW(slit_target, pitchG_target, pitchM2_target)
 
-    print('Target mono energy {0:6.2f} eV (BW {1:3.2f} eV), Cff {2:3.2f}'.format(E_target, BW_target, Cff_target))
-    print('RBV mono energy {0:6.2f} eV (BW {1:3.2f} eV), Cff {2:3.2f}'.format(E, BW, Cff))
-    print('FEL set energy {0:6.2f} eV'.format(E_FEL))
+    print("Target mono energy {0:6.2f} eV (BW {1:3.2f} eV), Cff {2:3.2f}".format(E_target, BW_target, Cff_target))
+    print("RBV mono energy {0:6.2f} eV (BW {1:3.2f} eV), Cff {2:3.2f}".format(E, BW, Cff))
+    print("FEL set energy {0:6.2f} eV".format(E_FEL))
 
     return
 
-def move_E(*args):
-    '''
-    Moves the mono and Vernier/undulator to specified energy.
-    Arguments:  args[0] (required) - photon energy (eV)
-                args[1] (optional) - pre-mirror pitch (urad)
+
+def move_E(E: float, pitchM2: float | None = None):
+    """
+    Move the mono and Vernier/undulator to specified energy.
+
+    Arguments:  E (required) - photon energy (eV)
+                pitchM2 (optional) - pre-mirror pitch (urad)
     If pre-mirror pitch is not given, then pre-mirror target PV value is used.
     Returns:    None
     Examples:   move_E(500)
                 move_E(400, 140800)
-    '''
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    PV_SET1 = 'RIX:USER:MCC:EPHOTK:SET1'
-
-    if len(args)==1:
-        E = args[0]
-        try:
-            temppv = EpicsSignal(PV_pitchM2)
-            pitchM2 = temppv.get()
-        except:
-            print('Failed to read PV: ' + PV_pitchM2)
-    elif len(args)==2:
-        E = args[0]
-        pitchM2 = args[1]
-    else:
-        raise Exception('One or two arguments needed.')
+    """
+    if pitchM2 is None:
+        pitchM2 = get_pitch_m2(rbv=False)
 
     pitchG, Cff = calc_pitch(E, pitchM2)
 
     # report current energy
-    #get_E()
+    # get_E()
 
-    #
-    print('Will do following moves:')
-    print(' Grating pitch to {0:8.2f} urad, pre-mirror pitch to {1:8.2f} urad'.format(pitchG, pitchM2))
-    print(' FEL photon energy to {0:6.2f} eV'.format(E))
+    print("Will do following moves:")
+    print(" Grating pitch to {0:8.2f} urad, pre-mirror pitch to {1:8.2f} urad".format(pitchG, pitchM2))
+    print(" FEL photon energy to {0:6.2f} eV".format(E))
+
+    PV_pitchG = "SP1K1:MONO:MMS:G_PI"
+    PV_pitchM2 = "SP1K1:MONO:MMS:M_PI"
+    PV_SET1 = "RIX:USER:MCC:EPHOTK:SET1"
 
     # command grating pitch, pre-mirror and FEL energy moves
-    try:
-        temppv = EpicsSignal(PV_pitchG)
-        tempval = temppv.put(pitchG)
-    except:
-        print('Failed to write PV: ' + PV_pitchG)
-    try:
-        temppv = EpicsSignal(PV_pitchM2)
-        tempval = temppv.put(pitchM2)
-    except:
-        print('Failed to write PV: ' + PV_pitchM2)
-    try:
-        temppv = EpicsSignal(PV_SET1)
-        tempval = temppv.put(E)
-    except:
-        print('Failed to write PV: ' + PV_SET1)
+    res_pitchG = caput(PV_pitchG, pitchG)
+    res_pitchM2 = caput(PV_pitchM2, pitchM2)
+    res_photk = caput(PV_SET1, E)
 
-    return
+    if res_pitchG != 1:
+        print("Failed to write PV: " + PV_pitchG)
+    if res_pitchM2 != 1:
+        print("Failed to write PV: " + PV_pitchM2)
+    if res_photk != 1:
+        print("Failed to write PV: " + PV_SET1)
 
-def move_E_Cff(*args):
-    '''
-    Moves the mono and Vernier/undulator to specified energy.
+
+def move_E_Cff(E: float, Cff: float):
+    """
+    Move the mono and Vernier/undulator to specified energy.
+
     Arguments:  args[0] (required) - photon energy (eV)
                 args[1] (required) - Cff
     Returns:    None
     Examples:   move_E(400, 1.2)
                 move_E(700, 1.13)
-    '''
-
-    if len(args)==2:
-        E = args[0]
-        Cff = args[1]
-        pitchG, pitchM2 = calc_pitchCff(E, Cff)
-    else:
-        raise Exception('Two arguments needed.')
-
-    PV_pitchG = 'SP1K1:MONO:MMS:G_PI'
-    PV_pitchM2 = 'SP1K1:MONO:MMS:M_PI'
-    PV_SET1 = 'RIX:USER:MCC:EPHOTK:SET1'
+    """
+    pitchG, pitchM2 = calc_pitchCff(E, Cff)
 
     # report current energy
-    #get_E()
-    
+    # get_E()
+
     #
-    print('Will do following moves:')
-    print(' Grating pitch to {0:8.2f} urad, pre-mirror pitch to {1:8.2f} urad'.format(pitchG, pitchM2))
-    print(' FEL photon energy to {0:6.2f} eV'.format(E))
+    print("Will do following moves:")
+    print(" Grating pitch to {0:8.2f} urad, pre-mirror pitch to {1:8.2f} urad".format(pitchG, pitchM2))
+    print(" FEL photon energy to {0:6.2f} eV".format(E))
 
-    try:
-        temppv = EpicsSignal(PV_pitchG)
-        tempval = temppv.put(pitchG)
-    except:
-        print('Failed to write PV: ' + PV_pitchG)
+    PV_pitchG = "SP1K1:MONO:MMS:G_PI"
+    PV_pitchM2 = "SP1K1:MONO:MMS:M_PI"
+    PV_SET1 = "RIX:USER:MCC:EPHOTK:SET1"
 
-    try:
-        temppv = EpicsSignal(PV_pitchM2)
-        tempval = temppv.put(pitchM2)
-    except:
-        print('Failed to write PV: ' + PV_pitchM2)
-    try:
-        temppv = EpicsSignal(PV_SET1)
-        tempval = temppv.put(E)
-    except:
-        print('Failed to write PV: ' + PV_SET1)
+    res_pitchG = caput(PV_pitchG, pitchG)
+    res_pitchM2 = caput(PV_pitchM2, pitchM2)
+    res_photk = caput(PV_SET1, E)
 
-    return
+    if res_pitchG != 1:
+        print("Failed to write PV: " + PV_pitchG)
+    if res_pitchM2 != 1:
+        print("Failed to write PV: " + PV_pitchM2)
+    if res_photk != 1:
+        print("Failed to write PV: " + PV_SET1)
+
 
 def setKScanningPVs(E=None):
-    '''
-    Sets the K scanning PVs to current Mono energy
-    '''
+    """Set the K scanning PVs to current Mono energy."""
     if E is None:
-        E,cff = calc_E()
-    
+        E, cff = calc_E()
+
     print(f"Setting {E:.2f} eV as reference energy for K Scanning. Type 'y' to continue")
     answer = input()
-    if answer.lower() not in ["y","yes"]:
-        print('Reference change aborted')
+    if answer.lower() not in ["y", "yes"]:
+        print("Reference change aborted")
         return
-    
-    EpicsSignal('RIX:USER:MCC:EPHOTK:REF1').put(E)
-    EpicsSignal('RIX:USER:MCC:EPHOTK:SET1').put(E)
 
-    reference = EpicsSignal('RIX:USER:MCC:EPHOTK:REF1').get()
-    setpoint = EpicsSignal('RIX:USER:MCC:EPHOTK:SET1').get()
+    caput("RIX:USER:MCC:EPHOTK:REF1", E)
+    caput("RIX:USER:MCC:EPHOTK:SET1", E)
+
+    reference = caget_with_error("RIX:USER:MCC:EPHOTK:REF1")
+    setpoint = caget_with_error("RIX:USER:MCC:EPHOTK:SET1")
     print(f"Reference RIX:USER:MCC:EPHOTK:REF1 set to {reference:.2f} eV.")
     print(f"Set point RIX:USER:MCC:EPHOTK:SET1 set to {setpoint:.2f} eV.")
-    return
 
+
+def get_KB0(usH0: float | None = None, dsH0: float | None = None, usV0: float | None = None, dsV0: float | None = None):
+    """
+    Return current focus position from KB optics.
+
+    Focus position is calculated based on the KBs benders calibration.
+    Arguments: None
+    Returns: None
+    """
+    return 0.0, 0.0

@@ -1,8 +1,15 @@
-.PHONY: build, clean
+.PHONY: prod, dev, clean
 
-build:
+# Ensure isolated build and compiled pyc for prod
+# Keep as first option so a generic make hits this
+prod:
 	pixi install --no-hard-links
-	python -m compileall -j 20
+	pixi run python -m compileall -j 20 .
 
+# Use hardlinks etc. for dev
+dev:
+	pixi install
+
+# Clear the install
 clean:
 	pixi clean
