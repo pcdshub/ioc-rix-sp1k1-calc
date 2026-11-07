@@ -614,14 +614,3 @@ def setKScanningPVs(E=None):
     setpoint = caget_with_error("RIX:USER:MCC:EPHOTK:SET1")
     print(f"Reference RIX:USER:MCC:EPHOTK:REF1 set to {reference:.2f} eV.")
     print(f"Set point RIX:USER:MCC:EPHOTK:SET1 set to {setpoint:.2f} eV.")
-
-
-def get_KB0(usH0: float | None = None, dsH0: float | None = None, usV0: float | None = None, dsV0: float | None = None):
-    """
-    Return current focus position from KB optics.
-
-    Focus position is calculated based on the KBs benders calibration.
-    Arguments: None
-    Returns: None
-    """
-    return 0.0, 0.0

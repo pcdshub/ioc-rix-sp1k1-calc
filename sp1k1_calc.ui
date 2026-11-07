@@ -1,0 +1,883 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>963</width>
+    <height>523</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="label">
+     <property name="text">
+      <string>SP1K1 Calc: ${PREFIX}</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout">
+     <item>
+      <widget class="QGroupBox" name="groupBox">
+       <property name="title">
+        <string>Inputs</string>
+       </property>
+       <layout class="QFormLayout" name="formLayout">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>Grating Pitch</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>3</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:MMS:G_PI.RBV</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_4">
+          <property name="text">
+           <string>Pre-Mirror Pitch</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_3">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>3</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:MMS:M_PI.RBV</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="label_5">
+          <property name="text">
+           <string>Exit Slit Gap</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_4">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>3</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SL1K2:EXIT:MMS:GAP.RBV</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_6">
+          <property name="text">
+           <string>Grating State</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_5">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>false</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:GRATING:STATE:GET_RBV</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="label_8">
+          <property name="text">
+           <string>M2 Offset</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_6">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>6</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:M2_OFFSET</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label_9">
+          <property name="text">
+           <string>LRG Offset</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_7">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>6</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:LRG_OFFSET</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="0">
+         <widget class="QLabel" name="label_10">
+          <property name="text">
+           <string>LEG Offset</string>
+          </property>
+         </widget>
+        </item>
+        <item row="6" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_8">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>6</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:LEG_OFFSET</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="0">
+         <widget class="QLabel" name="label_11">
+          <property name="text">
+           <string>MEG Offset</string>
+          </property>
+         </widget>
+        </item>
+        <item row="7" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_9">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>6</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:MEG_OFFSET</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="8" column="0">
+         <widget class="QLabel" name="label_12">
+          <property name="text">
+           <string>HEG Offset</string>
+          </property>
+         </widget>
+        </item>
+        <item row="8" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_10">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>6</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:HEG_OFFSET</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="0">
+         <widget class="QLabel" name="label_13">
+          <property name="text">
+           <string>Diffraction Order</string>
+          </property>
+         </widget>
+        </item>
+        <item row="9" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_12">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>false</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>SP1K1:MONO:CALC:DIF_ORDER</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="10" column="0">
+         <widget class="QLabel" name="label_20">
+          <property name="text">
+           <string>MR3K2 Focus</string>
+          </property>
+         </widget>
+        </item>
+        <item row="10" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_18">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>MR3K2:KBH:CALC:FOCUS</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="11" column="0">
+         <widget class="QLabel" name="label_21">
+          <property name="text">
+           <string>MR4K2 Focus</string>
+          </property>
+         </widget>
+        </item>
+        <item row="11" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_19">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>MR4K2:KBV:CALC:FOCUS</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="groupBox_2">
+       <property name="title">
+        <string>Outputs</string>
+       </property>
+       <layout class="QFormLayout" name="formLayout_2">
+        <item row="0" column="0">
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Energy</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_2">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:ENERGY</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="0">
+         <widget class="QLabel" name="label_15">
+          <property name="text">
+           <string>Cff</string>
+          </property>
+         </widget>
+        </item>
+        <item row="1" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_13">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:CFF</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0">
+         <widget class="QLabel" name="label_16">
+          <property name="text">
+           <string>Bandwidth</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_14">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:BANDWIDTH</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+          <property name="displayFormat">
+           <enum>PyDMLabel::Exponential</enum>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="0">
+         <widget class="QLabel" name="label_17">
+          <property name="text">
+           <string>Grating State</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_15">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>false</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:GRATING</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_16">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:MR3K2:FOCUS</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="0">
+         <widget class="QLabel" name="label_19">
+          <property name="text">
+           <string>MR4K2 Focus</string>
+          </property>
+         </widget>
+        </item>
+        <item row="5" column="1">
+         <widget class="PyDMLabel" name="PyDMLabel_17">
+          <property name="toolTip">
+           <string/>
+          </property>
+          <property name="precision">
+           <number>0</number>
+          </property>
+          <property name="showUnits">
+           <bool>true</bool>
+          </property>
+          <property name="precisionFromPV">
+           <bool>true</bool>
+          </property>
+          <property name="alarmSensitiveContent">
+           <bool>false</bool>
+          </property>
+          <property name="alarmSensitiveBorder">
+           <bool>true</bool>
+          </property>
+          <property name="PyDMToolTip">
+           <string/>
+          </property>
+          <property name="channel">
+           <string>${PREFIX}:MR4K2:FOCUS</string>
+          </property>
+          <property name="enableRichText">
+           <bool>false</bool>
+          </property>
+          <property name="displayLabelText">
+           <bool>false</bool>
+          </property>
+          <property name="disconnectedText">
+           <string/>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
+         <widget class="QLabel" name="label_18">
+          <property name="text">
+           <string>MR3K2 Focus</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PyDMLabel</class>
+   <extends>QLabel</extends>
+   <header>pydm.widgets.label</header>
+  </customwidget>
+ </customwidgets>
+ <resources/>
+ <connections/>
+</ui>

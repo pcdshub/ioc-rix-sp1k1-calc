@@ -1,19 +1,89 @@
 """Module for caproto IOC class."""
 
-import numpy as np
-from caproto import ChannelType
-from caproto.asyncio.client import Context
+import sys
+import traceback
+
+from caproto import CaprotoError, ChannelData, ChannelType, ReadNotifyResponse
+from caproto.asyncio.client import PV, Context
 from caproto.server import PVGroup, pvproperty
 
-from .rix_mono import calc_BW, calc_E, get_KB0
-
-# Ignore motor moves smaller than this number
-DEADBAND = 0.05
-BENDER_DEADBAND = 0.001
+from .data import SP1K1DataModel, sp1k1_pv_mapping
 
 
 class Ioc_rix_sp1k1_calc(PVGroup):
     """ioc-rix-sp1k1-calc."""
+
+    def __init__(self, *args, **kwargs):
+        # Main calcs
+        self.data_model = SP1K1DataModel()
+        # Caproto PVs
+        self.pv_attr_map: dict[str, PV] = {}
+        # Flags for startup progress
+        self.startup_complete = False
+        self.first_calc_complete = False
+        # Backwards compatibility pass-through
+        self.focus_src: dict[str, PV] = {}
+        super().__init__(*args, **kwargs)
+
+    async def startup_hook(self, async_lib):
+        """Initialize all source PVs used in the IOC."""
+        self.client_context = Context()
+
+        # PVs defined in the data model
+        pv_objs = await self.client_context.get_pvs(*sp1k1_pv_mapping.values())
+        for attr, pvo in zip(sp1k1_pv_mapping, pv_objs, strict=True):
+            self.pv_attr_map[attr] = pvo
+
+        # PV data sources for backwards compatibility
+        self.focus_src["mr3k2"], self.focus_src["mr4k2"] = await self.client_context.get_pvs(
+            "MR3K2:KBH:CALC:FOCUS", "MR4K2:KBV:CALC:FOCUS"
+        )
+        self.startup_complete = True
+
+    update = pvproperty(name="update", value=False, record="bi")
+
+    @update.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def update(self, instance, async_lib):
+        """Read PVs, update the data model, calculate."""
+        if not self.startup_complete:
+            return
+        for attr, pvo in self.pv_attr_map.items():
+            try:
+                # Note: this is slow if the external PVs are disconnected
+                # This is OK because we can't have good values anyway in these cases
+                res: ReadNotifyResponse = await pvo.read(data_type="control")
+            except CaprotoError as exc:
+                print(exc)
+                continue
+            if hasattr(res.metadata, "enum_strings"):
+                try:
+                    value = res.metadata.enum_strings[res.data[0]].decode("utf-8")
+                except Exception as exc:
+                    traceback.print_exception(exc)
+                    continue
+            else:
+                value = res.data[0]
+            setattr(self.data_model, attr, value)
+        try:
+            self.data_model.update_calcs()
+        except Exception as exc:
+            traceback.print_exception(exc)
+        else:
+            self.first_calc_complete = True
+
+    async def update_if_type(self, instance: ChannelData, tp: type, value):
+        """Update a name-matched floating point value from data model to PV."""
+        if not self.first_calc_complete:
+            return
+        if isinstance(value, tp):
+            if value == instance.value:
+                return
+            try:
+                await instance.write(value)
+            except CaprotoError as exc:
+                traceback.print_exception(exc)
+        else:
+            print(f"Cannot use non-{tp} {value} for {instance}, skip update", file=sys.stderr)
 
     energy = pvproperty(
         value=0.0,
@@ -24,6 +94,12 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         precision=3,
         units="eV",
     )
+
+    @energy.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def energy(self, instance, async_lib):
+        """Update energy PV with last calculated value."""
+        await self.update_if_type(instance, float, self.data_model.energy)
+
     cff = pvproperty(
         value=0.0,
         name="CFF",
@@ -32,6 +108,12 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         doc="Cff number",
         precision=3,
     )
+
+    @cff.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def cff(self, instance, async_lib):
+        """Update cff PV with last calculated value."""
+        await self.update_if_type(instance, float, self.data_model.cff)
+
     bandwidth = pvproperty(
         value=0.0,
         name="BANDWIDTH",
@@ -41,6 +123,13 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         precision=3,
         units="eV",
     )
+
+    @bandwidth.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def bandwidth(self, instance, async_lib):
+        """Update bandwidth PV with last calculated value."""
+        await self.update_if_type(instance, float, self.data_model.bandwidth)
+
+    # Backwards compatibility: no longer calculated here
     grating = pvproperty(
         value="",
         dtype=ChannelType.STRING,  # ty: ignore[invalid-argument-type]
@@ -49,6 +138,13 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         read_only=True,
         doc="Which grating is in use",
     )
+
+    @grating.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def grating(self, instance, async_lib):
+        """Forward last fetched value."""
+        await self.update_if_type(instance, str, self.data_model.gr_state)
+
+    # Backwards compatibility: no longer calculated here
     mr3k2_focaldist = pvproperty(
         value=0.0,
         name="MR3K2:FOCUS",
@@ -58,6 +154,20 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         precision=3,
         units="m",
     )
+
+    @mr3k2_focaldist.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def mr3k2_focaldist(self, instance, async_lib):
+        """Get and forward value."""
+        if not self.first_calc_complete:
+            return
+        try:
+            res: ReadNotifyResponse = await self.focus_src["mr3k2"].read()
+        except CaprotoError as exc:
+            print(exc)
+            return
+        await self.update_if_type(instance, float, res.data[0])
+
+    # Backwards compatibility: no longer calculated here
     mr4k2_focaldist = pvproperty(
         value=0.0,
         name="MR4K2:FOCUS",
@@ -68,132 +178,14 @@ class Ioc_rix_sp1k1_calc(PVGroup):
         units="m",
     )
 
-    def __init__(self, *args, **kwargs):
-        self.g_pi_value = None
-        self.m_pi_value = None
-        self.exit_gap_value = None
-        self.g_h_value = None
-        self.mr3k2_bend_value = None
-        self.mr4k2_bend_value = None
-        super().__init__(*args, **kwargs)
-
-    async def __ainit__(self, async_lib):
-        """
-        Set up async monitoring and callbacks of the critical mono PVs.
-
-        This must be called as the startup hook when we run the server.
-        """
-        self.client_context = Context()
-
-        (
-            self.g_pi_pv,
-            self.m_pi_pv,
-            self.exit_gap_pv,
-            self.g_h_pv,
-            self.mr3k2_bend_pv,
-            self.mr4k2_bend_pv,
-        ) = await self.client_context.get_pvs(
-            "SP1K1:MONO:MMS:G_PI.RBV",
-            "SP1K1:MONO:MMS:M_PI.RBV",
-            "SL1K2:EXIT:MMS:GAP.RBV",
-            "SP1K1:MONO:GRATING:STATE:GET_RBV",
-            "MR3K2:KBH:MMS:BEND:US.RBV",
-            "MR4K2:KBV:MMS:BEND:US.RBV",
-        )
-
-        self.g_pi_sub = self.g_pi_pv.subscribe(data_type="time")
-        self.g_pi_sub.add_callback(self._g_pi_callback)
-
-        self.m_pi_sub = self.m_pi_pv.subscribe(data_type="time")
-        self.m_pi_sub.add_callback(self._m_pi_callback)
-
-        self.exit_gap_sub = self.exit_gap_pv.subscribe(data_type="time")
-        self.exit_gap_sub.add_callback(self._exit_gap_callback)
-
-        self.g_h_pv = self.g_h_pv.subscribe(data_type="time")
-        self.g_h_pv.add_callback(self._g_h_callback)
-
-        self.mr3k2_bend_pv = self.mr3k2_bend_pv.subscribe(data_type="time")
-        self.mr3k2_bend_pv.add_callback(self._mr3k2_bend_callback)
-
-        self.mr4k2_bend_pv = self.mr4k2_bend_pv.subscribe(data_type="time")
-        self.mr4k2_bend_pv.add_callback(self._mr4k2_bend_callback)
-
-    async def _g_pi_callback(self, pv, response):
-        """Update calculations that use the grating pitch position."""
-        if self.g_pi_value is None or not np.isclose(self.g_pi_value, response.data, rtol=0, atol=DEADBAND):
-            self.g_pi_value = response.data
-            await self._update_energy_calc(response.metadata.timestamp)
-            await self._update_bandwidth_calc(response.metadata.timestamp)
-
-    async def _m_pi_callback(self, pv, response):
-        """Update calculations that use the mirror pitch position."""
-        if self.m_pi_value is None or not np.isclose(self.m_pi_value, response.data, rtol=0, atol=DEADBAND):
-            self.m_pi_value = response.data
-            await self._update_energy_calc(response.metadata.timestamp)
-            await self._update_bandwidth_calc(response.metadata.timestamp)
-
-    async def _exit_gap_callback(self, pv, response):
-        """Update calculations that use the exit slit gap length."""
-        if self.exit_gap_value is None or not np.isclose(self.exit_gap_value, response.data, rtol=0, atol=DEADBAND):
-            self.exit_gap_value = response.data
-            await self._update_bandwidth_calc(response.metadata.timestamp)
-
-    async def _g_h_callback(self, pv, response):
-        """Update calculations that use the grating horizontal position."""
-        if self.g_h_value is None or not np.isclose(self.g_h_value, response.data, rtol=0, atol=DEADBAND):
-            self.g_h_value = response.data
-            await self._update_grating_calc(response.metadata.timestamp)
-
-    async def _mr3k2_bend_callback(self, pv, response):
-        """Update calculations that use the mr3k2 bender position."""
-        if self.mr3k2_bend_value is None or not np.isclose(
-            self.mr3k2_bend_value, response.data, rtol=0, atol=BENDER_DEADBAND
-        ):
-            self.mr3k2_bend_value = response.data
-            await self._update_focaldist_calc(response.metadata.timestamp)
-
-    async def _mr4k2_bend_callback(self, pv, response):
-        """Update calculations that use the mr4k2 bender position."""
-        if self.mr4k2_bend_value is None or not np.isclose(
-            self.mr4k2_bend_value, response.data, rtol=0, atol=BENDER_DEADBAND
-        ):
-            self.mr4k2_bend_value = response.data
-            await self._update_focaldist_calc(response.metadata.timestamp)
-
-    async def _update_energy_calc(self, timestamp):
-        """Update our energy and cff PVs based on the most recent values."""
-        new_energy, new_cff = self.calculate_energy()
-        await self.energy.write(new_energy, timestamp=timestamp)
-        await self.cff.write(new_cff, timestamp=timestamp)
-
-    def calculate_energy(self) -> tuple[float, float]:
-        """Run the rix_calibration calculation for the energy and cff values."""
-        if None in (self.g_pi_value, self.m_pi_value):
-            return (0, 0)
-        return calc_E(self.g_pi_value, self.m_pi_value)
-
-    async def _update_bandwidth_calc(self, timestamp):
-        """Update our bandwidth PV based on the most recent values."""
-        new_bandwidth = self.calculate_bandwidth()
-        await self.bandwidth.write(new_bandwidth, timestamp=timestamp)
-
-    def calculate_bandwidth(self) -> float:
-        """Run the rix_calibration calculation for the mono bandwidth."""
-        if None in (self.g_pi_value, self.m_pi_value, self.exit_gap_value):
-            return 0
-        return calc_BW(self.exit_gap_value, self.g_pi_value, self.m_pi_value)
-
-    async def _update_grating_calc(self, timestamp):
-        """Update our grating identity PV based on the most recent values."""
-        await self.grating.write(self.g_h_value or "", timestamp=timestamp)
-
-    async def _update_focaldist_calc(self, timestamp):
-        """Update our focal distance PVs based on the most recent values."""
-        new_mr3k2_focaldist, new_mr4k2_focaldist = self.calculate_focaldists()
-        await self.mr3k2_focaldist.write(new_mr3k2_focaldist, timestamp=timestamp)
-        await self.mr4k2_focaldist.write(new_mr4k2_focaldist, timestamp=timestamp)
-
-    def calculate_focaldists(self) -> tuple[float, float]:
-        """Run the rix_calibration calculation for the focal distance values."""
-        return get_KB0()
+    @mr4k2_focaldist.scan(period=2.0, use_scan_field=True)  # ty: ignore[invalid-argument-type]
+    async def mr4k2_focaldist(self, instance, async_lib):
+        """Get and forward value."""
+        if not self.first_calc_complete:
+            return
+        try:
+            res: ReadNotifyResponse = await self.focus_src["mr4k2"].read()
+        except CaprotoError as exc:
+            print(exc)
+            return
+        await self.update_if_type(instance, float, res.data[0])

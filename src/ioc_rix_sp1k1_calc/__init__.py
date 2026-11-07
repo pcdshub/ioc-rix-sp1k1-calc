@@ -1,12 +1,11 @@
 """Launcher for the server."""
 
-import textwrap
 from os import environ
 from pathlib import Path
 
 import caproto.server
 
-from ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
+from .ioc_rix_sp1k1_calc import Ioc_rix_sp1k1_calc
 
 
 def install_archive(pv_names):
@@ -26,10 +25,13 @@ def install_archive(pv_names):
 
 def main():
     """Run the server process."""
+    default_prefix = "SP1K1:MONO:CALC:"
     ioc_options, run_options = caproto.server.ioc_arg_parser(
-        default_prefix="SP1K1:MONO:CALC:", desc=textwrap.dedent(Ioc_rix_sp1k1_calc.__doc__)
+        default_prefix=default_prefix,
+        desc="SP1K1 Calc IOC",
     )
 
     ioc = Ioc_rix_sp1k1_calc(**ioc_options)
-    install_archive(ioc.pvdb.keys())
-    caproto.server.run(ioc.pvdb, startup_hook=ioc.__ainit__, **run_options)
+    if ioc_options["prefix"] == default_prefix:
+        install_archive(ioc.pvdb.keys())
+    caproto.server.run(ioc.pvdb, startup_hook=ioc.startup_hook, **run_options)  # ty: ignore[invalid-argument-type]
