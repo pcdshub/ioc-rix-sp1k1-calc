@@ -6,6 +6,8 @@ Intentionally IOC backend independent.
 
 from dataclasses import dataclass
 
+import numpy as np
+
 from .rix_mono_calcs import (
     raw_calc_alpha_beta,
     raw_calc_bandwidth,
@@ -21,10 +23,11 @@ class SP1K1DataModel:
     """
     Data model for SP1K1 IOC.
 
-    This can be used robustly with three scan loops:
-    - Loop 1 gets new values for the PV inputs
-    - Loop 2 runs update_calcs
-    - Loop 3 updates output PVs
+    This can be used robustly in 1-3 scan loops:
+    - get new values for the PV inputs
+    - call update_value for each
+    - run update_calcs
+    - update output PVs
     """
 
     # Mono PVs
@@ -45,6 +48,26 @@ class SP1K1DataModel:
     energy: float = 0.0
     cff: float = 0.0
     bandwidth: float = 0.0
+
+    # Settings
+    buffer_size: int = 5
+
+    def __post_init__(self):
+        """Initialize buffers for rolling averages of noisy inputs."""
+        self.buffers: dict[str, list[float]] = {"gr_pitch": [], "m2_pitch": [], "slit_gap": []}
+
+    def update_value(self, attr: str, value: float | int | str):
+        """Update a value, and for buffered values use a rolling average."""
+        if attr in self.buffers:
+            if isinstance(value, float):
+                self.buffers[attr].append(value)
+                while len(self.buffers[attr]) > self.buffer_size:
+                    self.buffers[attr].pop(0)
+                setattr(self, attr, float(np.mean(self.buffers[attr])))
+            else:
+                raise TypeError(f"Expected float for {attr}, got {value}")
+        else:
+            setattr(self, attr, value)
 
     def update_calcs(self):
         """Run calculations on the input fields to set the results."""

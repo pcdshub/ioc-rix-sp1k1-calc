@@ -39,8 +39,6 @@ R = 20.0e3  # mm, exit slit distance
 
 ### Calculations used in the IOC
 
-## Calculation intermediaries
-
 
 def raw_calc_alpha_beta(pitchG: float, pitchM2: float, offsetG: float, offsetM2: float) -> tuple[float, float]:
     """
@@ -90,9 +88,6 @@ def select_D0(name: str) -> float:
         raise ValueError("Invalid D0 name, must be one of  LRG, LEF, MEG, HEG")
 
 
-## IOC calculation deliverables
-
-
 def raw_calc_energy(alpha: float, beta: float, dif_order: int, D0: float) -> float:
     """
     Calculate the mono photon energy [eV].
@@ -134,7 +129,3 @@ def raw_calc_bandwidth(alpha: float, beta: float, dif_order: int, D0: float, sli
     ang_disp = dif_order * D0 * eVmm * np.cos(beta) / (np.sin(alpha) + np.sin(beta)) ** 2  # angular dispersion
     lin_disp = ang_disp / R  # linear dispersion
     return (slit_gap / 1000) * lin_disp
-
-
-### Calculations only used in hutch-python
-# TODO
