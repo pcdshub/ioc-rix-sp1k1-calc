@@ -39,7 +39,7 @@ jobs:
       contents: read
     uses: pcdshub/pcds-ci-helpers/.github/workflows/python-uv-build.yml@9056140f6458a710e7ef4823d9f65fe5d8c32f45
     with:
-      package-name: "pixi_app_template"
+      package-name: "ioc_rix_sp1k1_calc"
 
 #  # On tag, uploads the files from pypi-build to pypi. Requires trusted publishing to be set up.
 #  # This cannot include the central workflow like the others, it unfortunately needs to be copied into the file here.
